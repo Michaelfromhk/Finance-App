@@ -1,12 +1,14 @@
 from fastapi import APIRouter, HTTPException
 import yfinance as yf
 import pandas as pd
+import httpx
 from pydantic import BaseModel
-from typing import Optional, List
 from datetime import datetime
 import time
 
 router = APIRouter(prefix="/api/market", tags=["market"])
+
+ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query"
 
 
 class MarketDataResponse(BaseModel):
@@ -21,9 +23,38 @@ class MarketDataResponse(BaseModel):
     timestamp: datetime
 
 
+def get_alpha_vantage_data(symbol: str):
+    api_key = "demo"
+    try:
+        response = httpx.get(ALPHA_VANTAGE_URL, params={
+            "function": "GLOBAL_QUOTE",
+            "symbol": symbol,
+            "apikey": api_key
+        }, timeout=10)
+        
+        data = response.json()
+        quote = data.get("Global Quote", {})
+        
+        if quote and quote.get("05. price"):
+            return {
+                "symbol": symbol.upper(),
+                "name": symbol.upper(),
+                "price": float(quote["05. price"]),
+                "change": float(quote["09. change"]),
+                "change_percent": float(quote["10. change percent"].replace("%", "")),
+                "high": float(quote["03. high"]),
+                "low": float(quote["04. low"]),
+                "volume": int(quote["06. volume"]),
+                "timestamp": datetime.now()
+            }
+    except Exception as e:
+        return None
+    return None
+
+
 @router.get("/{symbol}", response_model=MarketDataResponse)
 async def get_market_data(symbol: str):
-    for attempt in range(3):
+    for attempt in range(2):
         try:
             ticker = yf.Ticker(symbol)
             hist = ticker.history(period="5d", auto_adjust=True, timeout=10)
@@ -52,15 +83,16 @@ async def get_market_data(symbol: str):
                     "volume": int(current["Volume"]) if "Volume" in current else 0,
                     "timestamp": datetime.now()
                 }
-            
-            if attempt < 2:
-                time.sleep(2)
         except Exception as e:
-            if attempt == 2:
-                raise HTTPException(status_code=503, detail=f"Yahoo Finance unavailable: {str(e)}")
-            time.sleep(2)
+            pass
+        
+        time.sleep(1)
     
-    raise HTTPException(status_code=404, detail=f"No data found for {symbol}. Try again later.")
+    alpha_data = get_alpha_vantage_data(symbol)
+    if alpha_data:
+        return alpha_data
+    
+    raise HTTPException(status_code=404, detail=f"No data found for {symbol}")
 
 
 @router.get("/history/{symbol}")
@@ -69,7 +101,7 @@ async def get_market_history(symbol: str, period: str = "1mo"):
     if period not in valid_periods:
         period = "1mo"
     
-    for attempt in range(3):
+    for attempt in range(2):
         try:
             ticker = yf.Ticker(symbol)
             hist = ticker.history(period=period, auto_adjust=True, timeout=15)
@@ -89,12 +121,9 @@ async def get_market_history(symbol: str, period: str = "1mo"):
                         for index, row in hist.iterrows()
                     ]
                 }
-            
-            if attempt < 2:
-                time.sleep(2)
         except Exception as e:
-            if attempt == 2:
-                raise HTTPException(status_code=503, detail=f"Yahoo Finance unavailable: {str(e)}")
-            time.sleep(2)
+            pass
+        
+        time.sleep(1)
     
-    raise HTTPException(status_code=404, detail=f"No data found for {symbol}. Try again later.")
+    raise HTTPException(status_code=404, detail=f"No data found for {symbol}")
