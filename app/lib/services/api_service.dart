@@ -4,7 +4,7 @@ import '../models/market.dart';
 import '../models/prompt.dart';
 
 class ApiService {
-  static const String defaultBaseUrl = 'https://api.finance-app.com';
+  static const String defaultBaseUrl = 'https://finance-app-production-6e07.up.railway.app';
   String _baseUrl = defaultBaseUrl;
 
   void setBaseUrl(String url) {
