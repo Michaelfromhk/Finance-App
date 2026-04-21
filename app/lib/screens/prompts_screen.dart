@@ -94,7 +94,7 @@ class _PromptsScreenState extends State<PromptsScreen> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'google', child: Text('Google')),
-                    DropdownMenuItem(value: 'openai', child: Text('OpenAI')),
+                    DropdownMenuItem(value: 'openrouter', child: Text('OpenRouter')),
                   ],
                   onChanged: (value) {
                     setDialogState(() => provider = value!);

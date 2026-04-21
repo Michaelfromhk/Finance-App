@@ -174,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: SegmentedButton<String>(
                 segments: const [
                   ButtonSegment(value: 'google', label: Text('Google')),
-                  ButtonSegment(value: 'openai', label: Text('OpenAI')),
+                  ButtonSegment(value: 'openrouter', label: Text('OpenRouter')),
                 ],
                 selected: {_selectedProvider},
                 onSelectionChanged: (Set<String> selection) {

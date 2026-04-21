@@ -15,6 +15,7 @@ Backend API for financial market data and AI news aggregation.
 
 ## Environment Variables
 
+- `OPENROUTER_API_KEY` - OpenRouter API key (recommended)
 - `OPENAI_API_KEY` - OpenAI API key
 - `GOOGLE_AI_API_KEY` - Google AI Studio API key
 - `FUTU_API_KEY` - Futu API key

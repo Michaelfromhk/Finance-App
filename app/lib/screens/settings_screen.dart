@@ -11,7 +11,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _baseUrlController = TextEditingController();
   final TextEditingController _googleApiController = TextEditingController();
-  final TextEditingController _openaiApiController = TextEditingController();
+  final TextEditingController _openrouterApiController = TextEditingController();
   bool _isSaving = false;
 
   @override
@@ -25,7 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _baseUrlController.text = prefs.getString('base_url') ?? 'https://api.finance-app.com';
       _googleApiController.text = prefs.getString('google_api_key') ?? '';
-      _openaiApiController.text = prefs.getString('openai_api_key') ?? '';
+      _openrouterApiController.text = prefs.getString('openrouter_api_key') ?? '';
     });
   }
 
@@ -35,7 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('base_url', _baseUrlController.text);
       await prefs.setString('google_api_key', _googleApiController.text);
-      await prefs.setString('openai_api_key', _openaiApiController.text);
+      await prefs.setString('openrouter_api_key', _openrouterApiController.text);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Settings saved!')),
@@ -89,10 +89,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _openaiApiController,
+              controller: _openrouterApiController,
               decoration: const InputDecoration(
-                labelText: 'OpenAI API Key',
-                hintText: 'Enter your OpenAI API key',
+                labelText: 'OpenRouter API Key',
+                hintText: 'Enter your OpenRouter API key',
                 border: OutlineInputBorder(),
               ),
               obscureText: true,
@@ -147,7 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _baseUrlController.dispose();
     _googleApiController.dispose();
-    _openaiApiController.dispose();
+    _openrouterApiController.dispose();
     super.dispose();
   }
 }

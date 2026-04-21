@@ -30,6 +30,7 @@ class NewsResponse(BaseModel):
 
 GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta2/models/gemini-pro:generateContent"
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 @router.post("/news", response_model=NewsResponse)
@@ -42,6 +43,10 @@ async def generate_news(request: NewsRequest):
         if not settings.openai_api_key:
             raise HTTPException(status_code=500, detail="OpenAI API key not configured")
         return await _openai_generate(request)
+    elif request.provider == "openrouter":
+        if not settings.openrouter_api_key:
+            raise HTTPException(status_code=500, detail="OpenRouter API key not configured")
+        return await _openrouter_generate(request)
     else:
         raise HTTPException(status_code=400, detail="Invalid provider")
 
@@ -106,5 +111,42 @@ async def _openai_generate(request: NewsRequest):
             "content": content,
             "sources": [],
             "provider": "openai",
+            "timestamp": datetime.now()
+        }
+
+
+async def _openrouter_generate(request: NewsRequest):
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            OPENROUTER_URL,
+            headers={
+                "Authorization": f"Bearer {settings.openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://finance-app.com",
+                "X-Title": "Finance App"
+            },
+            json={
+                "model": "openai/gpt-3.5-turbo",
+                "messages": [
+                    {"role": "system", "content": "You are a financial news analyst. Provide concise, well-sourced summaries."},
+                    {"role": "user", "content": request.prompt}
+                ],
+                "temperature": 0.7,
+                "max_tokens": 2048
+            },
+            timeout=60.0
+        )
+        
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail=f"OpenRouter API error: {response.text}")
+        
+        data = response.json()
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        
+        return {
+            "prompt": request.prompt,
+            "content": content,
+            "sources": [],
+            "provider": "openrouter",
             "timestamp": datetime.now()
         }
