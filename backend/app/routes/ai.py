@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 class NewsRequest(BaseModel):
     prompt: str
-    provider: Optional[str] = "google"
+    provider: Optional[str] = "openrouter"
     max_sources: Optional[int] = 5
 
 
@@ -28,7 +28,7 @@ class NewsResponse(BaseModel):
     timestamp: datetime
 
 
-GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta2/models/gemini-pro:generateContent"
+GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1/models/{model}:generateContent"
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -55,9 +55,12 @@ async def _google_generate(request: NewsRequest):
     prompt_text = f"""Based on the following prompt, provide a concise financial news summary:\n\n{request.prompt}\n\n
 Format your response with clear sections and cite sources where applicable."""
     
+    model = "gemini-2.0-flash"
+    url = GOOGLE_AI_URL.replace("{model}", model)
+    
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            f"{GOOGLE_AI_URL}?key={settings.google_ai_api_key}",
+            f"{url}?key={settings.google_ai_api_key}",
             json={
                 "contents": [{"parts": [{"text": prompt_text}]}],
                 "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2048}
@@ -66,7 +69,11 @@ Format your response with clear sections and cite sources where applicable."""
         )
         
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail="Google AI API error")
+            error_detail = response.json() if response.status_code != 200 else {}
+            raise HTTPException(
+                status_code=response.status_code, 
+                detail=f"Google AI API error: {error_detail}"
+            )
         
         data = response.json()
         content = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
