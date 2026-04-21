@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 import httpx
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 from app.config import settings
 
@@ -12,14 +12,6 @@ FRED_URL = "https://api.stlouisfed.org/fred"
 
 def get_fred_key():
     return settings.fred_api_key or "demo"
-
-
-class EconomicIndicator(BaseModel):
-    series_id: str
-    name: str
-    value: Optional[float]
-    date: str
-    unit: Optional[str] = None
 
 
 ECONOMIC_INDICATORS = {
@@ -38,14 +30,14 @@ ECONOMIC_INDICATORS = {
 
 def get_fred_observation(series_id: str):
     url = f"{FRED_URL}/series/observations"
-params = {
-            "series_id": series_id,
-            "api_key": settings.fred_api_key or "339aba63d51aaaff6f2ac541d087d587",
-            "file_type": "json",
+    params = {
+        "series_id": series_id,
+        "api_key": get_fred_key(),
+        "file_type": "json",
         "limit": 1,
         "sort_order": "desc"
     }
-    
+
     try:
         response = httpx.get(url, params=params, timeout=30)
         if response.status_code == 200:
@@ -60,7 +52,7 @@ params = {
                     "value": float(value) if value and value != "." else None
                 }
         return None
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -85,13 +77,13 @@ async def get_indicator(series_id: str):
     upper_id = series_id.upper()
     if upper_id not in ECONOMIC_INDICATORS:
         raise HTTPException(status_code=404, detail=f"Unknown indicator: {series_id}")
-    
+
     info = ECONOMIC_INDICATORS[upper_id]
     data = get_fred_observation(info["id"])
-    
+
     if not data:
         raise HTTPException(status_code=404, detail="No data available")
-    
+
     return {
         "series_id": upper_id,
         "name": info["name"],
@@ -106,9 +98,9 @@ async def get_indicator_history(series_id: str, limit: int = 52):
     upper_id = series_id.upper()
     if upper_id not in ECONOMIC_INDICATORS:
         raise HTTPException(status_code=404, detail="Unknown indicator")
-    
+
     info = ECONOMIC_INDICATORS[upper_id]
-    
+
     url = f"{FRED_URL}/series/observations"
     params = {
         "series_id": info["id"],
@@ -117,15 +109,15 @@ async def get_indicator_history(series_id: str, limit: int = 52):
         "limit": limit,
         "sort_order": "desc"
     }
-    
+
     try:
         response = httpx.get(url, params=params, timeout=30)
         if response.status_code != 200:
-            raise HTTPException(status_code=500, detail="FRED API error - may need API key")
-        
+            raise HTTPException(status_code=500, detail="FRED API error")
+
         data = response.json()
         observations = data.get("observations", [])
-        
+
         return {
             "series_id": upper_id,
             "name": info["name"],
@@ -149,7 +141,7 @@ async def get_bond_yields():
         "US_5Y": "DGS5",
         "US_30Y": "DGS30",
     }
-    
+
     results = []
     for name, series_id in bonds.items():
         data = get_fred_observation(series_id)
@@ -159,7 +151,7 @@ async def get_bond_yields():
                 "yield": data["value"],
                 "date": data["date"]
             })
-    
+
     return results
 
 
@@ -191,72 +183,34 @@ async def get_currency(pair: str):
     upper_pair = pair.upper()
     if upper_pair not in CURRENCY_PAIRS:
         raise HTTPException(status_code=404, detail="Unknown currency pair")
-    
+
     symbol = CURRENCY_PAIRS[upper_pair]
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-    
+
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
+        headers = {"User-Agent": "Mozilla/5.0"}
         response = httpx.get(url, headers=headers, timeout=15)
-        
+
         if response.status_code != 200:
-            return {
-                "symbol": upper_pair,
-                "name": upper_pair,
-                "price": None,
-                "change": None,
-                "change_percent": None,
-                "timestamp": datetime.now().isoformat(),
-                "error": "Yahoo Finance unavailable"
-            }
-        
+            return {"symbol": upper_pair, "error": "Yahoo unavailable", "price": None}
+
         data = response.json()
         result = data.get("chart", {}).get("result", [{}])[0]
-        
+
         if not result:
-            return {
-                "symbol": upper_pair,
-                "name": upper_pair,
-                "price": None,
-                "change": None,
-                "change_percent": None,
-                "timestamp": datetime.now().isoformat(),
-                "error": "No data available"
-            }
-        
+            return {"symbol": upper_pair, "error": "No data", "price": None}
+
         quote = result.get("indicators", {}).get("quote", [{}])[0]
-        
-        if not quote or not quote.get("close"):
-            return {
-                "symbol": upper_pair,
-                "name": upper_pair,
-                "price": None,
-                "change": None,
-                "change_percent": None,
-                "timestamp": datetime.now().isoformat(),
-                "error": "No quote data"
-            }
-        
-        closes = [p for p in quote["close"] if p is not None]
-        
+        closes = [p for p in quote.get("close", []) if p is not None]
+
         if not closes:
-            return {
-                "symbol": upper_pair,
-                "name": upper_pair,
-                "price": None,
-                "change": None,
-                "change_percent": None,
-                "timestamp": datetime.now().isoformat(),
-                "error": "Empty price data"
-            }
-        
-        current = closes[-1] if closes else 0
+            return {"symbol": upper_pair, "error": "No prices", "price": None}
+
+        current = closes[-1]
         previous = closes[-2] if len(closes) > 1 else current
         change = current - previous
         change_percent = (change / previous * 100) if previous else 0
-        
+
         return {
             "symbol": upper_pair,
             "name": upper_pair,
@@ -266,15 +220,7 @@ async def get_currency(pair: str):
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        return {
-            "symbol": upper_pair,
-            "name": upper_pair,
-            "price": None,
-            "change": None,
-            "change_percent": None,
-            "timestamp": datetime.now().isoformat(),
-            "error": str(e)
-        }
+        return {"symbol": upper_pair, "error": str(e), "price": None}
 
 
 @router.get("/commodity/{name}")
@@ -282,72 +228,34 @@ async def get_commodity(name: str):
     upper_name = name.upper()
     if upper_name not in COMMODITIES:
         raise HTTPException(status_code=404, detail="Unknown commodity")
-    
+
     symbol = COMMODITIES[upper_name]
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-    
+
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
+        headers = {"User-Agent": "Mozilla/5.0"}
         response = httpx.get(url, headers=headers, timeout=15)
-        
+
         if response.status_code != 200:
-            return {
-                "symbol": upper_name,
-                "name": upper_name,
-                "price": None,
-                "change": None,
-                "change_percent": None,
-                "timestamp": datetime.now().isoformat(),
-                "error": "Yahoo Finance unavailable"
-            }
-        
+            return {"symbol": upper_name, "error": "Yahoo unavailable", "price": None}
+
         data = response.json()
         result = data.get("chart", {}).get("result", [{}])[0]
-        
+
         if not result:
-            return {
-                "symbol": upper_name,
-                "name": upper_name,
-                "price": None,
-                "change": None,
-                "change_percent": None,
-                "timestamp": datetime.now().isoformat(),
-                "error": "No data available"
-            }
-        
+            return {"symbol": upper_name, "error": "No data", "price": None}
+
         quote = result.get("indicators", {}).get("quote", [{}])[0]
-        
-        if not quote or not quote.get("close"):
-            return {
-                "symbol": upper_name,
-                "name": upper_name,
-                "price": None,
-                "change": None,
-                "change_percent": None,
-                "timestamp": datetime.now().isoformat(),
-                "error": "No quote data"
-            }
-        
-        closes = [p for p in quote["close"] if p is not None]
-        
+        closes = [p for p in quote.get("close", []) if p is not None]
+
         if not closes:
-            return {
-                "symbol": upper_name,
-                "name": upper_name,
-                "price": None,
-                "change": None,
-                "change_percent": None,
-                "timestamp": datetime.now().isoformat(),
-                "error": "Empty price data"
-            }
-        
-        current = closes[-1] if closes else 0
+            return {"symbol": upper_name, "error": "No prices", "price": None}
+
+        current = closes[-1]
         previous = closes[-2] if len(closes) > 1 else current
         change = current - previous
         change_percent = (change / previous * 100) if previous else 0
-        
+
         return {
             "symbol": upper_name,
             "name": upper_name,
@@ -357,12 +265,4 @@ async def get_commodity(name: str):
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        return {
-            "symbol": upper_name,
-            "name": upper_name,
-            "price": None,
-            "change": None,
-            "change_percent": None,
-            "timestamp": datetime.now().isoformat(),
-            "error": str(e)
-        }
+        return {"symbol": upper_name, "error": str(e), "price": None}
