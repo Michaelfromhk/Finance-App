@@ -5,6 +5,7 @@ import httpx
 from pydantic import BaseModel
 from datetime import datetime
 import time
+from app.config import settings
 
 router = APIRouter(prefix="/api/market", tags=["market"])
 
@@ -24,7 +25,7 @@ class MarketDataResponse(BaseModel):
 
 
 def get_alpha_vantage_data(symbol: str):
-    api_key = "demo"
+    api_key = settings.alphavantage_api_key or "demo"
     try:
         response = httpx.get(ALPHA_VANTAGE_URL, params={
             "function": "GLOBAL_QUOTE",
