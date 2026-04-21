@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     openrouter_api_key: Optional[str] = None
     google_ai_api_key: Optional[str] = None
     alphavantage_api_key: Optional[str] = None
+    fred_api_key: Optional[str] = None
     futu_api_key: Optional[str] = None
     futu_api_secret: Optional[str] = None
     database_url: Optional[str] = None

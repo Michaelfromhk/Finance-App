@@ -3,11 +3,15 @@ import httpx
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+from app.config import settings
 
 router = APIRouter(prefix="/api/econ", tags=["economics"])
 
 FRED_URL = "https://api.stlouisfed.org/fred"
-FRED_API_KEY = "demo"
+
+
+def get_fred_key():
+    return settings.fred_api_key or "demo"
 
 
 class EconomicIndicator(BaseModel):
@@ -34,10 +38,10 @@ ECONOMIC_INDICATORS = {
 
 def get_fred_observation(series_id: str):
     url = f"{FRED_URL}/series/observations"
-    params = {
-        "series_id": series_id,
-        "api_key": FRED_API_KEY,
-        "file_type": "json",
+params = {
+            "series_id": series_id,
+            "api_key": settings.fred_api_key or "339aba63d51aaaff6f2ac541d087d587",
+            "file_type": "json",
         "limit": 1,
         "sort_order": "desc"
     }
@@ -108,7 +112,7 @@ async def get_indicator_history(series_id: str, limit: int = 52):
     url = f"{FRED_URL}/series/observations"
     params = {
         "series_id": info["id"],
-        "api_key": FRED_API_KEY,
+        "api_key": get_fred_key(),
         "file_type": "json",
         "limit": limit,
         "sort_order": "desc"
