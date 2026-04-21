@@ -93,4 +93,42 @@ class ApiService {
       throw Exception('Failed to generate news: ${response.statusCode}');
     }
   }
+
+  Future<List<Map<String, dynamic>>> getEconomicIndicators() async {
+    final response = await http.get(Uri.parse('$_baseUrl/api/econ/indicators'));
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    } else {
+      throw Exception('Failed to load indicators: ${response.statusCode}');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getBondYields() async {
+    final response = await http.get(Uri.parse('$_baseUrl/api/econ/bonds'));
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    } else {
+      throw Exception('Failed to load bonds: ${response.statusCode}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getCurrency(String pair) async {
+    final response = await http.get(Uri.parse('$_baseUrl/api/econ/currency/$pair'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to load currency: ${response.statusCode}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getCommodity(String name) async {
+    final response = await http.get(Uri.parse('$_baseUrl/api/econ/commodity/$name'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to load commodity: ${response.statusCode}');
+    }
+  }
 }

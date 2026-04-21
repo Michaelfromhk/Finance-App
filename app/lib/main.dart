@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'screens/prompts_screen.dart';
-import 'screens/market_screen.dart';
+import 'screens/economics_screen.dart';
 import 'screens/settings_screen.dart';
 
 void main() {
@@ -37,7 +37,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const HomeScreen(),
     const PromptsScreen(),
-    const MarketScreen(),
+    const EconomicsScreen(),
     const SettingsScreen(),
   ];
 
@@ -64,9 +64,9 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Prompts',
           ),
           NavigationDestination(
-            icon: Icon(Icons.show_chart_outlined),
-            selectedIcon: Icon(Icons.show_chart),
-            label: 'Market',
+            icon: Icon(Icons.analytics_outlined),
+            selectedIcon: Icon(Icons.analytics),
+            label: 'Economics',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
