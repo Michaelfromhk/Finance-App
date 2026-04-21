@@ -29,39 +29,97 @@ class _EconomicsScreenState extends State<EconomicsScreen> {
       final indicators = await _apiService.getEconomicIndicators();
       final bonds = await _apiService.getBondYields();
 
-      List<Map<String, dynamic>> currencies = [];
-      try {
-        final eur = await _apiService.getCurrency('EURUSD');
-        if (eur['price'] != null) currencies.add(eur);
-      } catch (_) {}
-      try {
-        final jpy = await _apiService.getCurrency('USDJPY');
-        if (jpy['price'] != null) currencies.add(jpy);
-      } catch (_) {}
-      try {
-        final cny = await _apiService.getCurrency('USDCNY');
-        if (cny['price'] != null) currencies.add(cny);
-      } catch (_) {}
+      final currencies = await _apiService.getUserCurrencies();
+      final commodityList = await _apiService.getUserCommodities();
 
-      List<Map<String, dynamic>> commodities = [];
-      try {
-        final gold = await _apiService.getCommodity('GOLD');
-        if (gold['price'] != null) commodities.add(gold);
-      } catch (_) {}
-      try {
-        final oil = await _apiService.getCommodity('CRUDE_OIL');
-        if (oil['price'] != null) commodities.add(oil);
-      } catch (_) {}
+      List<Map<String, dynamic>> loadedCurrencies = [];
+      for (var c in currencies) {
+        try {
+          final data = await _apiService.getCurrency(c['symbol']);
+          if (data['price'] != null) loadedCurrencies.add(data);
+        } catch (_) {}
+      }
+
+      List<Map<String, dynamic>> loadedCommodities = [];
+      for (var c in commodityList) {
+        try {
+          final data = await _apiService.getCommodity(c['symbol']);
+          if (data['price'] != null) loadedCommodities.add(data);
+        } catch (_) {}
+      }
 
       setState(() {
         _indicators = indicators;
         _bonds = bonds;
-        _currencies = currencies;
-        _commodities = commodities;
+        _currencies = loadedCurrencies;
+        _commodities = loadedCommodities;
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  void _showAddDialog(String type) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add $type'),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: type == 'Currency' ? 'e.g., EURUSD' : 'e.g., GOLD',
+            labelText: type == 'Currency' ? 'Currency Pair' : 'Commodity',
+          ),
+          textCapitalization: TextCapitalization.characters,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final symbol = controller.text.toUpperCase().trim();
+              if (symbol.isEmpty) return;
+              try {
+                if (type == 'Currency') {
+                  await _apiService.addUserCurrency(symbol);
+                } else {
+                  await _apiService.addUserCommodity(symbol);
+                }
+                if (mounted) Navigator.pop(context);
+                _loadData();
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _removeItem(String symbol, String type) async {
+    try {
+      if (type == 'Currency') {
+        await _apiService.removeUserCurrency(symbol);
+      } else {
+        await _apiService.removeUserCommodity(symbol);
+      }
+      _loadData();
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
@@ -188,82 +246,126 @@ class _EconomicsScreenState extends State<EconomicsScreen> {
   }
 
   Widget _buildCurrenciesList() {
-    if (_currencies.isEmpty) {
-      return const Center(child: Text('No currency data available'));
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _currencies.length,
-      itemBuilder: (context, index) {
-        final currency = _currencies[index];
-        final price = currency['price'];
-        final change = (currency['change_percent'] ?? 0).toDouble();
-        final isPositive = change >= 0;
-
-        return Card(
-          child: ListTile(
-            title: Text(currency['symbol'] ?? ''),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  price != null ? price.toStringAsFixed(5) : 'N/A',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  '${isPositive ? '+' : ''}${change.toStringAsFixed(3)}%',
-                  style: TextStyle(
-                    color: isPositive ? Colors.green : Colors.red,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: OutlinedButton.icon(
+            onPressed: () => _showAddDialog('Currency'),
+            icon: const Icon(Icons.add),
+            label: const Text('Add Currency'),
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: _currencies.isEmpty
+              ? const Center(child: Text('No currencies added'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _currencies.length,
+                  itemBuilder: (context, index) {
+                    final currency = _currencies[index];
+                    final price = currency['price'];
+                    final change = (currency['change_percent'] ?? 0).toDouble();
+                    final isPositive = change >= 0;
+                    final symbol = currency['symbol'] ?? '';
+
+                    return Card(
+                      child: ListTile(
+                        title: Text(symbol),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  price != null ? price.toStringAsFixed(5) : 'N/A',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  '${isPositive ? '+' : ''}${change.toStringAsFixed(3)}%',
+                                  style: TextStyle(
+                                    color: isPositive ? Colors.green : Colors.red,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 20),
+                              onPressed: () => _removeItem(symbol, 'Currency'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
   Widget _buildCommoditiesList() {
-    if (_commodities.isEmpty) {
-      return const Center(child: Text('No commodity data available'));
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _commodities.length,
-      itemBuilder: (context, index) {
-        final commodity = _commodities[index];
-        final price = commodity['price'];
-        final change = (commodity['change_percent'] ?? 0).toDouble();
-        final isPositive = change >= 0;
-
-        return Card(
-          child: ListTile(
-            title: Text(commodity['name'] ?? ''),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  price != null ? '\$${price.toStringAsFixed(2)}' : 'N/A',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  '${isPositive ? '+' : ''}${change.toStringAsFixed(2)}%',
-                  style: TextStyle(
-                    color: isPositive ? Colors.green : Colors.red,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: OutlinedButton.icon(
+            onPressed: () => _showAddDialog('Commodity'),
+            icon: const Icon(Icons.add),
+            label: const Text('Add Commodity'),
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: _commodities.isEmpty
+              ? const Center(child: Text('No commodities added'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _commodities.length,
+                  itemBuilder: (context, index) {
+                    final commodity = _commodities[index];
+                    final price = commodity['price'];
+                    final change = (commodity['change_percent'] ?? 0).toDouble();
+                    final isPositive = change >= 0;
+                    final symbol = commodity['symbol'] ?? '';
+
+                    return Card(
+                      child: ListTile(
+                        title: Text(symbol),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  price != null ? '\$${price.toStringAsFixed(2)}' : 'N/A',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  '${isPositive ? '+' : ''}${change.toStringAsFixed(2)}%',
+                                  style: TextStyle(
+                                    color: isPositive ? Colors.green : Colors.red,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 20),
+                              onPressed: () => _removeItem(symbol, 'Commodity'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

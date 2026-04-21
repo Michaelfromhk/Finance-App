@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import market, ai, prompts, economics
+from app.routes import market, ai, prompts, economics, user
 
 app = FastAPI(
     title="Finance App API",
@@ -20,6 +20,7 @@ app.include_router(market.router)
 app.include_router(ai.router)
 app.include_router(prompts.router)
 app.include_router(economics.router)
+app.include_router(user.router)
 
 
 @app.get("/")

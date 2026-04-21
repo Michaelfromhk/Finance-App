@@ -131,4 +131,38 @@ class ApiService {
       throw Exception('Failed to load commodity: ${response.statusCode}');
     }
   }
+
+  Future<List<Map<String, dynamic>>> getUserCurrencies() async {
+    final response = await http.get(Uri.parse('$_baseUrl/api/user/currencies'));
+    if (response.statusCode == 200) {
+      return (json.decode(response.body) as List).cast<Map<String, dynamic>>();
+    } else {
+      return [];
+    }
+  }
+
+  Future<void> addUserCurrency(String symbol) async {
+    await http.post(Uri.parse('$_baseUrl/api/user/currencies/$symbol'));
+  }
+
+  Future<void> removeUserCurrency(String symbol) async {
+    await http.delete(Uri.parse('$_baseUrl/api/user/currencies/$symbol'));
+  }
+
+  Future<List<Map<String, dynamic>>> getUserCommodities() async {
+    final response = await http.get(Uri.parse('$_baseUrl/api/user/commodities'));
+    if (response.statusCode == 200) {
+      return (json.decode(response.body) as List).cast<Map<String, dynamic>>();
+    } else {
+      return [];
+    }
+  }
+
+  Future<void> addUserCommodity(String name) async {
+    await http.post(Uri.parse('$_baseUrl/api/user/commodities/$name'));
+  }
+
+  Future<void> removeUserCommodity(String name) async {
+    await http.delete(Uri.parse('$_baseUrl/api/user/commodities/$name'));
+  }
 }
